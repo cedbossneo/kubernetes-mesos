@@ -43,16 +43,17 @@ fi
 
 set -e
 
-if cmd_exists "ip"; then
-    export PUBLIC_IP=$(ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/')
-elif cmd_exists "ifconfig"; then
-    # Mac support
-    export PUBLIC_IP=$(ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active' | egrep -o -m 1 '^[^\t:]+' | xargs ipconfig getifaddr)
+if cmd_exists "ifconfig" && cmd_exists "ipconfig" && cmd_exists "pcregrep"; then
+    PUBLIC_IP=$(ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active' | egrep -o -m 1 '^[^\t:]+' | xargs ipconfig getifaddr)
+fi
+
+if [ -z "${PUBLIC_IP}" ] && cmd_exists "ip"; then
+    PUBLIC_IP=$(ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/')
 fi
 
 if [ -z "${PUBLIC_IP}" ]; then
-    echo "Public IP Not Found. Using 127.0.0.1"
-    PUBLIC_IP="127.0.0.1"
+    echo "Public IP Not Found. Using 0.0.0.0"
+    PUBLIC_IP="0.0.0.0"
 fi
 
 export K8SM_HOST=${PUBLIC_IP}
@@ -64,7 +65,7 @@ export MESOS_PORT=5050
 export MESOS_MASTER=${MESOS_HOST}:${MESOS_PORT}
 echo "Mesos: ${MESOS_MASTER}"
 
-export ETCD_HOST=localhost
+export ETCD_HOST=${PUBLIC_IP}
 export ETCD_PORT=4001
 export ETCD_URL=http://${ETCD_HOST}:${ETCD_PORT}
 echo "Etcd: ${ETCD_URL}"

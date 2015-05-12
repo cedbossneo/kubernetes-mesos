@@ -16,11 +16,19 @@ The Dockerfile includes everything needed to run a development instance of kuber
 docker run --name kubernetes-mesos -p 8888:8888 -p 5050:5050 -p 4001:4001 mesosphere/kubernetes-mesos &> /tmp/kubernetes-mesos-docker.log &
 ```
 
+To attach in interactive mode to a container already running in background mode, use:
+
+```
+docker exec -it kubernetes-mesos /bin/bash
+```
+
 ## Interactive mode
 
 ```
 docker run --name kubernetes-mesos -p 8888:8888 -p 5050:5050 -p 4001:4001  -i -t --entrypoint=/bin/bash mesosphere/kubernetes-mesos
 ```
+
+Note: Interactive mode launches bash instead of the start script.
 
 ## Stopping
 
@@ -28,7 +36,7 @@ docker run --name kubernetes-mesos -p 8888:8888 -p 5050:5050 -p 4001:4001  -i -t
 docker kill kubernetes-mesos
 ```
 
-## Start kubernetes-mesos locally (with etcd & mesos)
+## Starting kubernetes-mesos locally or in docker interactive mode (with etcd & mesos)
 
 ```
 $ ./scripts/start.sh
