@@ -25,10 +25,12 @@ WORKDIR /kubernetes-mesos
 ENV GOROOT /usr/local/go
 ENV PATH $GOROOT/bin:$PATH
 
-RUN ./scripts/install-go.sh
+RUN ./docker/install-go.sh
 
-RUN ./scripts/install-etcd.sh
+RUN ./docker/install-etcd.sh
 
 RUN make && make install DESTDIR=/kubernetes-mesos/bin
+
+ADD ./docker/mesos-cloud.conf /opt/mesos-cloud.conf
 
 ENTRYPOINT ["./scripts/start.sh"]

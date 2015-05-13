@@ -1,9 +1,22 @@
-# Testing
+# Docker Image
+
+## Self-contained Kubernetes-Mesos with Docker-Compose
+
+The provided docker-compose.yml contains a self-contained configuration for running kubernetes-mesos, including its dependencies (etcd & mesos).
+It will launch 5 docker containers linked together with hostnames and port forwarding.
+
+```
+# from inside the docker dir
+docker-compose up
+```
+
+[Docker Compose](https://docs.docker.com/compose/) can be installed via apt-get, homebrew, or [manually](https://docs.docker.com/compose/install/).
 
 ## Build Docker image
 
 ```
-docker build -t mesosphere/kubernetes-mesos .
+# from root of project, not inside the docker dir
+docker build -f ./docker/Dockerfile -t mesosphere/kubernetes-mesos .
 ```
 
 ## Run Docker container
