@@ -29,12 +29,12 @@ apiserver:
   - /bin/bash
   - "-c"
   - >
-    echo "Hostname: $(hostname -f) ($(hostname -f | xargs getent hosts | cut -d' ' -f1 | sort -u | tail -1))" &&
+    echo "Hostname: $(hostname -f) ($(hostname -f | xargs resolveip))" &&
     echo "mesos-master = mesos:5050" >> /opt/mesos-cloud.conf &&
-    timeout 10 bash -c "while ! echo exit | nc -z $(getent hosts etcd | cut -d' ' -f1 | sort -u | tail -1) 4001; do sleep 0.5; done" &&
-    timeout 10 bash -c "while ! echo exit | nc -z $(getent hosts mesos | cut -d' ' -f1 | sort -u | tail -1) 5050; do sleep 0.5; done" &&
-    /kubernetes-mesos/bin/km apiserver
-    --address=$(xargs getent hosts apiserver | cut -d' ' -f1 | sort -u | tail -1)
+    await-service $(resolveip etcd) 4001 &&
+    await-service $(resolveip mesos) 5050 &&
+    km apiserver
+    --address=$(resolveip apiserver)
     --external_hostname=apiserver
     --etcd_servers=http://etcd:4001
     --portal_net=10.10.10.0/24
@@ -53,11 +53,11 @@ controller:
   - /bin/bash
   - "-c"
   - >
-    echo "Hostname: $(hostname -f) ($(hostname -f | xargs getent hosts | cut -d' ' -f1 | sort -u | tail -1))" &&
+    echo "Hostname: $(hostname -f) ($(hostname -f | xargs resolveip))" &&
     echo "mesos-master = mesos:5050" >> /opt/mesos-cloud.conf &&
-    timeout 20 bash -c "while ! echo exit | nc -z $(getent hosts mesos | cut -d' ' -f1 | sort -u | tail -1) 5050; do sleep 0.5; done" &&
-    timeout 10 bash -c "while ! echo exit | nc -z $(getent hosts apiserver | cut -d' ' -f1 | sort -u | tail -1) 8888; do sleep 0.5; done" &&
-    /kubernetes-mesos/bin/km controller-manager
+    await-service $(resolveip mesos) 5050 20 &&
+    await-service $(resolveip apiserver) 8888 &&
+    km controller-manager
     --master=http://apiserver:8888
     --cloud_config=/opt/mesos-cloud.conf
     --v=2
@@ -71,13 +71,13 @@ scheduler:
   - /bin/bash
   - "-c"
   - >
-    echo "Hostname: $(hostname -f) ($(hostname -f | xargs getent hosts | cut -d' ' -f1 | sort -u | tail -1))" &&
+    echo "Hostname: $(hostname -f) ($(hostname -f | xargs resolveip))" &&
     echo "mesos-master = mesos:5050" >> /opt/mesos-cloud.conf &&
-    timeout 10 bash -c "while ! echo exit | nc -z $(getent hosts etcd | cut -d' ' -f1 | sort -u | tail -1) 4001; do sleep 0.5; done" &&
-    timeout 10 bash -c "while ! echo exit | nc -z $(getent hosts mesos | cut -d' ' -f1 | sort -u | tail -1) 5050; do sleep 0.5; done" &&
-    timeout 10 bash -c "while ! echo exit | nc -z $(getent hosts apiserver | cut -d' ' -f1 | sort -u | tail -1) 8888; do sleep 0.5; done" &&
-    /kubernetes-mesos/bin/km scheduler
-    --address=$(xargs getent hosts scheduler | cut -d' ' -f1 | sort -u | tail -1)
+    await-service $(resolveip etcd) 4001 &&
+    await-service $(resolveip mesos) 5050 &&
+    await-service $(resolveip apiserver) 8888 &&
+    km scheduler
+    --address=$(resolveip scheduler)
     --hostname_override=scheduler
     --etcd_servers=http://etcd:4001
     --mesos_user=root

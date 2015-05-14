@@ -31,6 +31,8 @@ RUN ./docker/install-etcd.sh
 
 RUN make && make install DESTDIR=/kubernetes-mesos/bin
 
-ADD ./docker/mesos-cloud.conf /opt/mesos-cloud.conf
+ENV PATH /kubernetes-mesos/bin:/kubernetes-mesos/bin/docker/bin:$PATH
+
+ADD ./docker/mesos-cloud.conf /opt/
 
 ENTRYPOINT ["./scripts/start.sh"]
