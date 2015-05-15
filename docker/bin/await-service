@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# Wait for a service to accept connections.
+# Block up to the max wait time (default: 10 seconds).
+# Usage: timeout <ip> <port> [max_wait]
+
+set -e
+
+ip=$1
+port=$2
+max_wait=${3:-10} # in seconds
+[ -z "$ip" ] && echo "No IP supplied" && exit 1
+[ -z "$port" ] && echo "No port supplied" && exit 1
+
+# add the current dir to PATH
+bin=$(cd $(dirname $0) && pwd -P)
+export PATH=$PATH:${bin}
+
+TIMEOUT=$(which timeout || true)
+if ! cmd-exists "timeout"; then
+    # mac homebrew installs gnu coreutils with g- prefix
+    ! cmd-exists "gtimeout" && echo "timeout or gtimeout command not found" && exit 1
+    TIMEOUT=$(which gtimeout)
+fi
+
+echo "Waiting (up to ${max_wait}s) for ${ip}:${port} to accept connections"
+if ! ${TIMEOUT} ${max_wait} bash -c "while ! echo exit | nc -z $ip $port; do sleep 0.5; done"; then
+  echo "Timed out"
+  exit 1
+fi

@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+
+# Run etcd, mesos-local, km apiserver, km controller-manager, and km scheduler.
+# Exiting (or failure of) this script will cause the above sub-processes to be killed.
+# Usage: km-local
+# Mac support requires gtimeout & pcregrep (brew install coreutils && brew install pcre)
+# Inputs:
+# PUBLIC_IP - IP the etcd, mesos, and km components will listen on (unless overridden by MESOS_IP or ETCD_IP)
+# MESOS_IP - IP that mesos is accessible on
+# MESOS_PORT - Port that mesos-master is accessible on (default 5050)
+# ETCD_IP - IP that etcd is accessible on
+# ETCD_PORT - Port that etcd is accessible on (default 4001)
+# LOG_DIR - Directory to write logs to (default /tmp/k8sm-logs)
+
+set -e
+
+# add the current dir to PATH
+bin=$(cd $(dirname $0) && pwd -P)
+export PATH=$PATH:${bin}
+
+# add kubernetes-mesos/bin to PATH (unless km-local has been moved)
+k8sm_bin=$(cd ${bin}/../../bin && pwd -P)
+[ -d "$k8sm_bin" ] && [ -e "${k8sm_bin}/km" ] && export PATH=$PATH:${k8sm_bin} || true
+
+# validate required scripts & binaries
+cmd-exists "await-service"
+cmd-exists "etcd"
+cmd-exists "mesos-local"
+cmd-exists "km-local"
+cmd-exists "publicip"
+
+TIMEOUT=$(which timeout || true)
+if ! cmd-exists "timeout"; then
+    # mac homebrew installs gnu coreutils with g- prefix
+    ! cmd-exists "gtimeout"
+    TIMEOUT=$(which gtimeout)
+fi
+
+PUBLIC_IP=$(publicip)
+
+set -e
+
+export MESOS_IP=${PUBLIC_IP}
+export MESOS_PORT=5050
+export MESOS_MASTER=${MESOS_IP}:${MESOS_PORT}
+echo "Mesos: ${MESOS_MASTER}"
+
+export ETCD_IP=${PUBLIC_IP}
+export ETCD_PORT=4001
+export ETCD_URL=http://${ETCD_IP}:${ETCD_PORT}
+echo "Etcd: ${ETCD_URL}"
+
+LOG_DIR=${LOG_DIR:-"/tmp/k8sm-logs"}
+mkdir -p ${LOG_DIR}
+echo "Log Dir: ${LOG_DIR}"
+
+echo "---------------------"
+
+
+SUBPROCS=()
+SUBPROC_NAMES=()
+
+pid_running () {
+    local CMD_PID=$1
+    return $(kill -0 ${CMD_PID} &> /dev/null)
+}
+
+# Add the pid of a sub-process or exit if it is not running
+add_subproc () {
+    local SUBPROC=$1
+    local SUBPROC_NAME="$2"
+    echo "Started ${SUBPROC_NAME} (${SUBPROC})"
+    if ! ps aux | grep -v grep | grep "${SUBPROC_NAME}" &> /dev/null; then
+        echo "Failed to start ${SUBPROC_NAME}"
+        exit 1
+    fi
+#    echo "Running ${SUBPROC_NAME} (${SUBPROC})"
+    SUBPROCS+=(${SUBPROC})
+    SUBPROC_NAME=${SUBPROC_NAME// /_} # replace spaces with underscores (bash arrays are space deliniated)
+    SUBPROC_NAMES+=(${SUBPROC_NAME})
+}
+
+# Kill subprocesses in reverse order of being started (to avoid log spam)
+kill_subprocs () {
+    SIGNAL=$1
+    echo "Shutting down [km-complete] (Signal: ${SIGNAL})"
+    if [ ! -z "${SUBPROCS}" ]; then
+        for ((i=${#SUBPROCS[@]}-1; i>=0; i--)); do
+            local SUBPROC=${SUBPROCS[i]}
+            local SUBPROC_NAME=${SUBPROC_NAMES[i]}
+            local SUBPROC_NAME=${SUBPROC_NAME//_/ } # replace underscores with spaces
+            if pid_running "${SUBPROC}"; then
+                echo "Killing ${SUBPROC_NAME} (${SUBPROC})"
+                #TODO(karl): propegate the recieved signal, instead of just TERM
+                kill ${SUBPROC} || true
+            fi
+        done
+    fi
+    if [ "${SIGNAL}" != "EXIT" ]; then
+        trap EXIT
+    fi
+}
+
+# propergate SIGINT & SIGTERM
+for sig in INT TERM EXIT; do
+    trap "kill_subprocs ${sig}" ${sig}
+done
+
+
+echo "Starting etcd &> ${LOG_DIR}/etcd.log"
+etcd \
+  -addr=${ETCD_IP}:${ETCD_PORT} \
+  &> ${LOG_DIR}/etcd.log \
+  &
+add_subproc "$!" "etcd"
+await-service ${ETCD_IP} ${ETCD_PORT}
+echo "---------------------"
+
+
+echo "Starting mesos-local ${LOG_DIR}/mesos.log"
+mesos-local \
+  &> ${LOG_DIR}/mesos.log \
+  &
+add_subproc "$!" "mesos-local"
+await-service ${MESOS_IP} ${MESOS_PORT}
+echo "---------------------"
+
+
+echo "Starting km-local"
+km-local &
+add_subproc "$!" "km-local"
+echo "---------------------"
+
+
+for subproc in "${SUBPROCS[@]}"; do
+    if pid_running "${subproc}"; then
+        echo "Waiting on ${subproc}"
+        wait ${subproc}
+    fi
+done

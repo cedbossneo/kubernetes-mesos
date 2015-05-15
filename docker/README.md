@@ -1,27 +1,23 @@
-# Docker Image
+# Running Kubernetes-Mesos In Docker
 
-## Self-contained Kubernetes-Mesos with Docker-Compose
+There are several ways to play with kubernetes-mesos in docker. Here are a couple that might be most useful:
 
-The provided docker-compose.yml contains a self-contained configuration for running kubernetes-mesos, including its dependencies (etcd & mesos).
-It will launch 5 docker containers linked together with hostnames and port forwarding.
+1) [Complete](#complete) - Run components and dependencies all in the same container
+    - All containers mirroring localhost ports (docker host mode)
+2) [Composed](#composed) - Run components and dependencies each in different containers
+    - Each container gets its own IP
+    - Requires an ambassador to proxy ports (docker doesn't allow circular hostname linking)
+    - Emulates a more complex system, useful for testing networking
 
-```
-# from inside the docker dir
-docker-compose up
-```
+While it is technically possible to run docker within a docker container, doing so requires running the mesos (slave) in priveledged mode.
+So the simplest way is to instead expose the bind mount the docker socket (`-v "/var/run/docker.sock:/var/run/docker.sock"`)
 
-[Docker Compose](https://docs.docker.com/compose/) can be installed via apt-get, homebrew, or [manually](https://docs.docker.com/compose/install/).
+In addition to running in docker, it's also possible to [run docker locally](#local).
 
-## Build Docker image
+<a name="complete"/>
+## K8SM Complete
 
-```
-# from root of project, not inside the docker dir
-docker build -f ./docker/Dockerfile -t mesosphere/kubernetes-mesos .
-```
-
-## Run Docker container
-
-The Dockerfile includes everything needed to run a development instance of kubernetes-mesos, including etcd and mesos.
+The "complete" Dockerfile includes everything needed to run a development instance of kubernetes-mesos, including etcd and mesos.
 
 ### Background mode
 
@@ -35,50 +31,73 @@ To attach in interactive mode to a container already running in background mode,
 docker exec -it kubernetes-mesos /bin/bash
 ```
 
-## Interactive mode
+### Interactive mode
 
 ```
-docker run --name kubernetes-mesos -p 8888:8888 -p 5050:5050 -p 4001:4001  -i -t --entrypoint=/bin/bash mesosphere/kubernetes-mesos
+docker run -it --name kubernetes-mesos -p 8888:8888 -p 5050:5050 -p 4001:4001 --entrypoint=/bin/bash mesosphere/kubernetes-mesos
 ```
 
 Note: Interactive mode launches bash instead of the start script.
 
-## Stopping
+### Stopping
 
 ```
 docker kill kubernetes-mesos
 ```
 
-## Starting kubernetes-mesos locally or in docker interactive mode (with etcd & mesos)
+### Building
 
 ```
-$ ./scripts/start.sh
+# from root of project (not inside the docker dir)
+docker build -f ./docker/complete/Dockerfile -t mesosphere/kubernetes-mesos-complete .
 ```
 
-Example output:
+
+<a name="composed"/>
+## K8SM Composed
+
+This method requires [Docker Compose](https://docs.docker.com/compose/) to be installed, which can be done via apt-get, homebrew, or [manually](https://docs.docker.com/compose/install/).
+
+The provided docker-compose.yml contains a self-contained configuration for running kubernetes-mesos, including its dependencies (etcd & mesos).
+It will launch 5 docker containers linked together with hostnames and port forwarding.
 
 ```
-Kubernetes: 1.2.3.4:8888
-Mesos: 1.2.3.4:5050
-Etcd: http://localhost:4001
-Config: /Users/<you>/go/src/github.com/mesosphere/kubernetes-mesos/mesos-cloud.conf
-Writing default config
-Log Dir: /tmp/k8sm-logs
----------------------
-Starting etcd
-Waiting (up to 10s) for etcd to accept connections
-Connection to localhost port 4001 [tcp/newoak] succeeded!
----------------------
-Starting mesos-local
-Waiting (up to 10s) for mesos-local to accept connections
-Connection to 1.2.3.4 port 5050 [tcp/mmcc] succeeded!
----------------------
-Starting km apiserver
-Waiting (up to 10s) for km apiserver to accept connections
-Connection to 1.2.3.4 port 8888 [tcp/ddi-tcp-1] succeeded!
----------------------
-Starting km controller-manager
----------------------
-Starting km scheduler
----------------------
+# from inside the docker dir
+docker-compose up
 ```
+
+This will tail all the logs for each of the containers into STDOUT.
+`ctrl-C` to exit.
+`docker-compose rm` to remove them afterwards (required to be able to start them again).
+
+### Building
+
+The docker-compose.yml file references multiple different docker images.
+
+The one that contains just kubernetes-mesos (not mesos or etcd) can be built with the following:
+
+```
+# from root of project (not inside the docker dir)
+docker build -f ./docker/complete/Dockerfile -t mesosphere/kubernetes-mesos-complete .
+```
+
+
+<a name="local"/>
+## K8SM Local
+
+Since kubernetes-mesos requires etcd, mesos, and docker, these can all be started at once or individually.
+
+To start etcd, mesos, and kubernetes-mesos to run locally use the following command:
+
+```
+$ ./docker/bin/km-complete
+```
+
+If you already have etc and mesos running locally use the following to start just the three kubernetes-mesos components:
+
+```
+$ ./docker/bin/km-local
+```
+
+Notes:
+- The kubernetes executor, and thus the mesos slave, needs docker to be installed (or configured via tcp). By default it talks to it using the socket `/var/run/docker.sock`.

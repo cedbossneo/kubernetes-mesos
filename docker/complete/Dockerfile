@@ -1,4 +1,5 @@
 FROM mesosphere/mesos:0.22.0-1.0.ubuntu1404
+MAINTAINER Mesosphere <support@mesosphere.io>
 
 RUN locale-gen en_US.UTF-8
 RUN dpkg-reconfigure locales
@@ -25,9 +26,9 @@ WORKDIR /kubernetes-mesos
 ENV GOROOT /usr/local/go
 ENV PATH $GOROOT/bin:$PATH
 
-RUN ./docker/install-go.sh
+RUN ./docker/complete/install-go.sh
 
-RUN ./docker/install-etcd.sh
+RUN ./docker/complete/install-etcd.sh
 
 RUN make && make install DESTDIR=/kubernetes-mesos/bin
 
@@ -35,4 +36,5 @@ ENV PATH /kubernetes-mesos/bin:/kubernetes-mesos/bin/docker/bin:$PATH
 
 ADD ./docker/mesos-cloud.conf /opt/
 
-ENTRYPOINT ["./scripts/start.sh"]
+EXPOSE 8888 5050 4001
+ENTRYPOINT ["km-complete"]

@@ -1,3 +1,8 @@
+ambassador:
+  image: cpuguy83/docker-grand-ambassador
+  volumes:
+  - /var/run/docker.sock:/var/run/docker.sock
+  command: "-name docker_etcd_1 -name docker_mesos_1 -name docker_apiserver_1 -name docker_controller_1 -name docker_scheduler_1"
 etcd:
   hostname: etcd
   image: coreos/etcd
@@ -21,6 +26,9 @@ mesos:
 #  - MESOS_ZK=zk://zookeeper:2181/mesos
   links:
   - etcd
+  - "ambassador:apiserver"
+  volumes:
+  - /var/run/docker.sock:/var/run/docker.sock
 #  - zookeeper
 apiserver:
   hostname: apiserver
