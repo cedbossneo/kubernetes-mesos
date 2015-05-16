@@ -2,12 +2,14 @@
 
 There are several ways to play with kubernetes-mesos in docker. Here are a couple that might be most useful:
 
-1) [Complete](#complete) - Run components and dependencies all in the same container
-    - All containers mirroring localhost ports (docker host mode)
-2) [Composed](#composed) - Run components and dependencies each in different containers
-    - Each container gets its own IP
-    - Requires an ambassador to proxy ports (docker doesn't allow circular hostname linking)
-    - Emulates a more complex system, useful for testing networking
+1. [Complete](#complete)
+  - Run components and dependencies all in the same container
+  - All containers mirroring localhost ports (docker host mode)
+2. [Composed](#composed)
+  - Run components and dependencies each in different containers
+  - Each container gets its own IP
+  - Requires an ambassador to proxy ports (docker doesn't allow circular hostname linking)
+  - Emulates a more complex system, useful for testing networking
 
 While it is technically possible to run docker within a docker container, doing so requires running the mesos (slave) in priveledged mode.
 So the simplest way is to instead expose the bind mount the docker socket (`-v "/var/run/docker.sock:/var/run/docker.sock"`)
